@@ -11,7 +11,8 @@ type Config struct {
 	// Server
 	ServerPort string
 	ServerHost string
-	ClientURL  string
+	ServerURL  string // Backend server URL for callbacks (e.g., http://api.domain.com or http://192.168.1.100:5000)
+	ClientURL  string // Frontend client URL (for CORS)
 
 	// Database
 	PostgresHost     string
@@ -62,10 +63,23 @@ func Load() (*Config, error) {
 	// Load .env file if exists
 	_ = godotenv.Load()
 
+	serverPort := getEnv("PORT", "5000")
+	serverHost := getEnv("SERVER_HOST", "0.0.0.0")
+	serverURL := getEnv("SERVER_URL", "") // Backend URL for callbacks
+	// If SERVER_URL not set, construct from SERVER_HOST and PORT
+	if serverURL == "" {
+		if serverHost == "0.0.0.0" || serverHost == "" {
+			serverURL = fmt.Sprintf("http://localhost:%s", serverPort)
+		} else {
+			serverURL = fmt.Sprintf("http://%s:%s", serverHost, serverPort)
+		}
+	}
+
 	cfg := &Config{
 		// Server
-		ServerPort: getEnv("PORT", "5000"),
-		ServerHost: getEnv("SERVER_HOST", "0.0.0.0"),
+		ServerPort: serverPort,
+		ServerHost: serverHost,
+		ServerURL:  serverURL,
 		ClientURL:  getEnv("CLIENT_URL", "http://localhost:3000"),
 
 		// Database

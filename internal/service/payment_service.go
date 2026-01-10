@@ -27,9 +27,10 @@ type PaymentService interface {
 }
 
 type paymentService struct {
-	paymentRepo repository.PaymentRepository
-	orderRepo   repository.OrderRepository
-	cfg         *config.Config
+	paymentRepo    repository.PaymentRepository
+	orderRepo      repository.OrderRepository
+	cfg            *config.Config
+	stopBackground chan bool // Channel to stop background job
 }
 
 // Midtrans API request/response structures
@@ -107,10 +108,95 @@ func NewPaymentService(
 	orderRepo repository.OrderRepository,
 	cfg *config.Config,
 ) PaymentService {
-	return &paymentService{
-		paymentRepo: paymentRepo,
-		orderRepo:   orderRepo,
-		cfg:         cfg,
+	service := &paymentService{
+		paymentRepo:    paymentRepo,
+		orderRepo:      orderRepo,
+		cfg:            cfg,
+		stopBackground: make(chan bool),
+	}
+
+	// Start background job to periodically check pending payments
+	if cfg.MidtransServerKey != "" {
+		go service.startBackgroundPaymentChecker()
+		log.Println("✅ Background payment status checker started (checking every 30 seconds)")
+	}
+
+	return service
+}
+
+// startBackgroundPaymentChecker runs in background to periodically check pending payment status
+func (s *paymentService) startBackgroundPaymentChecker() {
+	ticker := time.NewTicker(15 * time.Second) // Check every 15 seconds for faster detection
+	defer ticker.Stop()
+
+	// Do initial check after 5 seconds (to let server start properly)
+	time.Sleep(5 * time.Second)
+	s.checkAllPendingPayments()
+
+	log.Println("🔄 Background payment checker initialized (checking every 15 seconds)")
+
+	for {
+		select {
+		case <-ticker.C:
+			s.checkAllPendingPayments()
+		case <-s.stopBackground:
+			log.Println("🛑 Background payment checker stopped")
+			return
+		}
+	}
+}
+
+// checkAllPendingPayments checks status of all pending payments
+func (s *paymentService) checkAllPendingPayments() {
+	pendingPayments, err := s.paymentRepo.FindPendingPayments()
+	if err != nil {
+		log.Printf("⚠️  Failed to fetch pending payments: %v", err)
+		return
+	}
+
+	if len(pendingPayments) == 0 {
+		return // No pending payments to check
+	}
+
+	log.Printf("🔍 Background check: Checking status for %d pending payment(s)...", len(pendingPayments))
+
+	// Use semaphore to limit concurrent checks (max 5 at a time)
+	semaphore := make(chan struct{}, 5)
+
+	for _, payment := range pendingPayments {
+		// Skip if no transaction ID
+		if payment.MidtransTransactionID == nil || *payment.MidtransTransactionID == "" {
+			continue
+		}
+
+		// Check if payment is expired (based on expiry_time)
+		if payment.ExpiryTime != nil && payment.ExpiryTime.Before(time.Now()) {
+			log.Printf("⏰ Payment %s (Order: %s) has expired, marking as expired", payment.ID, payment.OrderID)
+			payment.Status = model.PaymentStatusExpired
+			s.paymentRepo.Update(payment)
+			continue
+		}
+
+		// Acquire semaphore
+		semaphore <- struct{}{}
+
+		// Check status asynchronously (non-blocking) with semaphore to limit concurrency
+		go func(p *model.Payment) {
+			defer func() { <-semaphore }() // Release semaphore when done
+
+			log.Printf("🔄 Background checking payment %s (Order: %s, Transaction: %s)",
+				p.ID, p.OrderID, *p.MidtransTransactionID)
+
+			if err := s.CheckPaymentStatusFromMidtrans(p.OrderID); err != nil {
+				// Log error but don't fail - will retry on next cycle
+				log.Printf("⚠️  Background check failed for payment %s (Order: %s): %v", p.ID, p.OrderID, err)
+			} else {
+				log.Printf("✅ Background check completed for payment %s (Order: %s)", p.ID, p.OrderID)
+			}
+		}(payment)
+
+		// Small delay between spawning goroutines to avoid overwhelming the system
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
@@ -294,11 +380,19 @@ func (s *paymentService) CreatePayment(orderID string, paymentMethod model.Payme
 		ItemDetails:     itemDetails,
 	}
 
-	// Add payment method specific config
-	frontendURL := s.cfg.ClientURL
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
+	// IMPORTANT: Callback URL MUST be backend server URL (NOT client/frontend URL)
+	// Midtrans will send webhook/callback to this URL when payment status changes
+	backendURL := s.cfg.ServerURL
+	if backendURL == "" {
+		// Fallback: construct from server host and port
+		backendURL = fmt.Sprintf("http://%s:%s", s.cfg.ServerHost, s.cfg.ServerPort)
+		if s.cfg.ServerHost == "0.0.0.0" {
+			// For development, use localhost
+			backendURL = fmt.Sprintf("http://localhost:%s", s.cfg.ServerPort)
+		}
 	}
+	callbackURL := fmt.Sprintf("%s/api/v1/payments/midtrans/callback", backendURL)
+	log.Printf("📍 Midtrans callback URL: %s", callbackURL)
 
 	switch paymentMethod {
 	case model.PaymentMethodBankTransfer:
@@ -307,11 +401,12 @@ func (s *paymentService) CreatePayment(orderID string, paymentMethod model.Payme
 			bank = strings.ToLower(*bankType)
 		}
 		chargeData.BankTransfer = &MidtransBankTransfer{Bank: bank}
+		// Bank transfer also supports callback, but it's usually configured in Midtrans Dashboard
 
 	case model.PaymentMethodGopay:
 		chargeData.Gopay = &MidtransGopay{
 			EnableCallback: true,
-			CallbackURL:    fmt.Sprintf("%s/api/v1/payments/midtrans/callback", frontendURL),
+			CallbackURL:    callbackURL, // Backend URL, not frontend
 		}
 
 	case model.PaymentMethodQRIS:
@@ -319,7 +414,7 @@ func (s *paymentService) CreatePayment(orderID string, paymentMethod model.Payme
 		chargeData.PaymentType = "qris"
 		chargeData.Gopay = &MidtransGopay{
 			EnableCallback: true,
-			CallbackURL:    fmt.Sprintf("%s/api/v1/payments/midtrans/callback", frontendURL),
+			CallbackURL:    callbackURL, // Backend URL, not frontend
 		}
 
 	case model.PaymentMethodCreditCard:
@@ -331,6 +426,7 @@ func (s *paymentService) CreatePayment(orderID string, paymentMethod model.Payme
 	case model.PaymentMethodAlfamart:
 		// Alfamart uses cstore payment type
 		chargeData.PaymentType = "cstore"
+		// Note: Alfamart callback should be configured in Midtrans Dashboard
 	}
 
 	// Charge to Midtrans
@@ -501,15 +597,19 @@ func (s *paymentService) GetPaymentByOrderID(orderID string) (*model.Payment, er
 func (s *paymentService) HandleMidtransCallback(notification map[string]interface{}) error {
 	orderID, ok := notification["order_id"].(string)
 	if !ok {
+		log.Printf("❌ Invalid Midtrans callback: missing order_id")
 		return errors.New("invalid notification: missing order_id")
 	}
 
 	transactionID, ok := notification["transaction_id"].(string)
 	if !ok {
+		log.Printf("❌ Invalid Midtrans callback for order %s: missing transaction_id", orderID)
 		return errors.New("invalid notification: missing transaction_id")
 	}
 
 	transactionStatus, _ := notification["transaction_status"].(string)
+	log.Printf("📞 Midtrans callback received - Order Number: %s, Transaction ID: %s, Status: %s",
+		orderID, transactionID, transactionStatus)
 
 	var vaNumber, bankType, qrCodeURL string
 
@@ -568,8 +668,17 @@ func (s *paymentService) HandleMidtransCallback(notification map[string]interfac
 
 	webhookJSON, _ := json.Marshal(notification)
 
+	log.Printf("🔄 Processing Midtrans callback - Order Number: %s, Status: %s", orderID, transactionStatus)
+
 	// Update payment status with fraud status included in midtransResponse
-	return s.UpdatePaymentStatus(orderID, transactionStatus, transactionID, vaNumber, bankType, qrCodeURL, expiryTime, string(webhookJSON))
+	// orderID here is the order_number we sent to Midtrans
+	if err := s.UpdatePaymentStatus(orderID, transactionStatus, transactionID, vaNumber, bankType, qrCodeURL, expiryTime, string(webhookJSON)); err != nil {
+		log.Printf("❌ Failed to update payment status from callback: %v", err)
+		return err
+	}
+
+	log.Printf("✅ Midtrans callback processed successfully - Order Number: %s, Status: %s", orderID, transactionStatus)
+	return nil
 }
 
 func (s *paymentService) CheckPaymentStatus(paymentID string) (*model.Payment, error) {
@@ -578,12 +687,18 @@ func (s *paymentService) CheckPaymentStatus(paymentID string) (*model.Payment, e
 		return nil, err
 	}
 
-	// Check status from Midtrans if transaction ID exists
-	if payment.MidtransTransactionID != nil && s.cfg.MidtransServerKey != "" {
+	// Check status from Midtrans if transaction ID exists and payment is still pending
+	if payment.MidtransTransactionID != nil && *payment.MidtransTransactionID != "" &&
+		payment.Status == model.PaymentStatusPending && s.cfg.MidtransServerKey != "" {
+		log.Printf("🔍 Checking payment status from Midtrans for payment ID: %s, Order Number: %s, Transaction ID: %s",
+			paymentID, payment.OrderID, *payment.MidtransTransactionID)
 		if err := s.CheckPaymentStatusFromMidtrans(payment.OrderID); err != nil {
 			log.Printf("⚠️  Failed to check payment status from Midtrans: %v", err)
+			// Don't return error, return current payment status instead
+		} else {
+			log.Printf("✅ Payment status check completed for payment ID: %s", paymentID)
 		}
-		// Reload payment after status check
+		// Reload payment after status check to get updated status
 		payment, _ = s.paymentRepo.FindByID(paymentID)
 	}
 
@@ -591,27 +706,34 @@ func (s *paymentService) CheckPaymentStatus(paymentID string) (*model.Payment, e
 }
 
 // CheckPaymentStatusFromMidtrans checks payment status from Midtrans API
-func (s *paymentService) CheckPaymentStatusFromMidtrans(orderID string) error {
-	// Get payment from database first
-	payment, err := s.paymentRepo.FindByOrderNumber(orderID)
+func (s *paymentService) CheckPaymentStatusFromMidtrans(orderNumber string) error {
+	// Get payment from database first by order number
+	payment, err := s.paymentRepo.FindByOrderNumber(orderNumber)
 	if err != nil {
-		return fmt.Errorf("payment not found: %v", err)
+		log.Printf("❌ Payment not found for order number %s: %v", orderNumber, err)
+		return fmt.Errorf("payment not found for order number %s: %v", orderNumber, err)
 	}
 
 	// If already successful, skip check
 	if payment.Status == model.PaymentStatusSuccess {
+		log.Printf("✅ Payment for order %s already successful, skipping check", orderNumber)
 		return nil
 	}
 
 	// If no transaction ID, cannot check
 	if payment.MidtransTransactionID == nil || *payment.MidtransTransactionID == "" {
+		log.Printf("⚠️  No transaction ID for payment with order number %s", orderNumber)
 		return fmt.Errorf("no transaction ID for payment")
 	}
+
+	log.Printf("🔍 Checking Midtrans status for transaction ID: %s (Order: %s)", *payment.MidtransTransactionID, orderNumber)
 
 	// Call Midtrans status API
 	baseURL := s.getMidtransBaseURL()
 	authHeader := s.getAuthHeader()
 	url := fmt.Sprintf("%s/%s/status", baseURL, *payment.MidtransTransactionID)
+
+	log.Printf("📍 Midtrans status API URL: %s", url)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -635,17 +757,27 @@ func (s *paymentService) CheckPaymentStatusFromMidtrans(orderID string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("⚠️  Midtrans API returned status %d: %s", resp.StatusCode, string(body))
-		return fmt.Errorf("Midtrans API error: %s", string(body))
+		return fmt.Errorf("Midtrans API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var midtransResp map[string]interface{}
 	if err := json.Unmarshal(body, &midtransResp); err != nil {
+		log.Printf("❌ Failed to parse Midtrans response: %v", err)
 		return fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	// Extract status information
-	transactionStatus, _ := midtransResp["transaction_status"].(string)
+	transactionStatus, ok := midtransResp["transaction_status"].(string)
+	if !ok || transactionStatus == "" {
+		log.Printf("⚠️  No transaction_status in Midtrans response: %s", string(body))
+		return fmt.Errorf("no transaction_status in response")
+	}
+
 	transactionID, _ := midtransResp["transaction_id"].(string)
+	orderIDFromMidtrans, _ := midtransResp["order_id"].(string)
+
+	log.Printf("📊 Midtrans response - Status: %s, Transaction ID: %s, Order ID: %s",
+		transactionStatus, transactionID, orderIDFromMidtrans)
 
 	var vaNumber, bankType, qrCodeURL string
 	if vaNumbers, ok := midtransResp["va_numbers"].([]interface{}); ok && len(vaNumbers) > 0 {
@@ -709,19 +841,28 @@ func (s *paymentService) CheckPaymentStatusFromMidtrans(orderID string) error {
 
 	webhookJSON, _ := json.Marshal(midtransResp)
 
-	return s.UpdatePaymentStatus(orderID, transactionStatus, transactionID, vaNumber, bankType, qrCodeURL, expiryTime, string(webhookJSON))
+	// Use order number from parameter (not from Midtrans response, as it might differ)
+	// The orderNumber parameter is the order_number we sent to Midtrans
+	log.Printf("🔄 Updating payment status for order number: %s with status: %s", orderNumber, transactionStatus)
+
+	return s.UpdatePaymentStatus(orderNumber, transactionStatus, transactionID, vaNumber, bankType, qrCodeURL, expiryTime, string(webhookJSON))
 }
 
 // UpdatePaymentStatus updates payment status from Midtrans webhook or status check
-func (s *paymentService) UpdatePaymentStatus(orderID string, status string, transactionID string, vaNumber string, bankType string, qrCodeURL string, expiryTime *time.Time, midtransResponse string) error {
+// orderID parameter here is actually the order_number (not UUID)
+func (s *paymentService) UpdatePaymentStatus(orderNumber string, status string, transactionID string, vaNumber string, bankType string, qrCodeURL string, expiryTime *time.Time, midtransResponse string) error {
 	paymentStatus := mapMidtransStatusToPaymentStatus(status)
 
-	// Get payment by order number
-	payment, err := s.paymentRepo.FindByOrderNumber(orderID)
+	log.Printf("🔄 Updating payment status - Order Number: %s, Status: %s -> %s", orderNumber, status, paymentStatus)
+
+	// Get payment by order number (order_number, not UUID)
+	payment, err := s.paymentRepo.FindByOrderNumber(orderNumber)
 	if err != nil {
-		log.Printf("❌ Payment not found for order %s: %v", orderID, err)
-		return fmt.Errorf("payment not found for order: %s", orderID)
+		log.Printf("❌ Payment not found for order number %s: %v", orderNumber, err)
+		return fmt.Errorf("payment not found for order number: %s", orderNumber)
 	}
+
+	log.Printf("📝 Current payment status: %s, updating to: %s", payment.Status, paymentStatus)
 
 	// Preserve existing values if new ones are empty
 	if qrCodeURL == "" && payment.QRCodeURL != nil && *payment.QRCodeURL != "" {
@@ -767,14 +908,22 @@ func (s *paymentService) UpdatePaymentStatus(orderID string, status string, tran
 		return err
 	}
 
+	log.Printf("✅ Payment updated successfully - Order Number: %s, New Status: %s", orderNumber, paymentStatus)
+
 	// Update order status if payment is successful
 	if paymentStatus == model.PaymentStatusSuccess {
 		order, err := s.orderRepo.FindByID(payment.OrderUUID)
-		if err == nil && order.Status == "pending" {
-			order.Status = "processing"
-			if err := s.orderRepo.Update(order); err != nil {
-				log.Printf("⚠️  Failed to update order status: %v", err)
+		if err == nil {
+			if order.Status == "pending" {
+				order.Status = "processing"
+				if err := s.orderRepo.Update(order); err != nil {
+					log.Printf("⚠️  Failed to update order status: %v", err)
+				} else {
+					log.Printf("✅ Order status updated to 'processing' for order UUID: %s", payment.OrderUUID)
+				}
 			}
+		} else {
+			log.Printf("⚠️  Order not found for UUID %s: %v", payment.OrderUUID, err)
 		}
 	}
 

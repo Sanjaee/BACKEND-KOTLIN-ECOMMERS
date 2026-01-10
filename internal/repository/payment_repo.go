@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"time"
 	"yourapp/internal/model"
 
 	"gorm.io/gorm"
@@ -12,6 +13,7 @@ type PaymentRepository interface {
 	FindByOrderID(orderID string) (*model.Payment, error)
 	FindByOrderNumber(orderNumber string) (*model.Payment, error)
 	FindByMidtransTransactionID(transactionID string) (*model.Payment, error)
+	FindPendingPayments() ([]*model.Payment, error) // Get all pending payments for background check
 	Update(payment *model.Payment) error
 	UpdateStatus(paymentID string, status model.PaymentStatus) error
 }
@@ -74,6 +76,28 @@ func (r *paymentRepository) FindByMidtransTransactionID(transactionID string) (*
 		return nil, err
 	}
 	return &payment, nil
+}
+
+func (r *paymentRepository) FindPendingPayments() ([]*model.Payment, error) {
+	var payments []*model.Payment
+	// Get all pending payments created in last 48 hours
+	// We'll filter by transaction ID in Go code for reliability
+	err := r.db.Where("status = ?", model.PaymentStatusPending).
+		Where("created_at > ?", time.Now().Add(-48*time.Hour)). // Check payments created in last 48 hours
+		Find(&payments).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter payments that have transaction ID
+	var validPayments []*model.Payment
+	for _, payment := range payments {
+		if payment.MidtransTransactionID != nil && *payment.MidtransTransactionID != "" {
+			validPayments = append(validPayments, payment)
+		}
+	}
+
+	return validPayments, nil
 }
 
 func (r *paymentRepository) Update(payment *model.Payment) error {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log"
 	"net/http"
 	"yourapp/internal/model"
 	"yourapp/internal/service"
@@ -94,6 +95,7 @@ func (h *PaymentHandler) GetPaymentByOrder(c *gin.Context) {
 
 // CheckPaymentStatus handles checking payment status
 // GET /api/v1/payments/:id/status
+// This endpoint always checks latest status from Midtrans API if payment is still pending
 func (h *PaymentHandler) CheckPaymentStatus(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -101,6 +103,7 @@ func (h *PaymentHandler) CheckPaymentStatus(c *gin.Context) {
 		return
 	}
 
+	// Force check from Midtrans API if payment is pending
 	payment, err := h.paymentService.CheckPaymentStatus(id)
 	if err != nil {
 		util.ErrorResponse(c, http.StatusNotFound, "Payment not found", nil)
@@ -112,17 +115,34 @@ func (h *PaymentHandler) CheckPaymentStatus(c *gin.Context) {
 
 // MidtransCallback handles Midtrans payment callback
 // POST /api/v1/payments/midtrans/callback
+// This is a PUBLIC endpoint - Midtrans will POST webhook notifications here
+// Note: In production, you should verify the signature for security
 func (h *PaymentHandler) MidtransCallback(c *gin.Context) {
 	var notification map[string]interface{}
 	if err := c.ShouldBindJSON(&notification); err != nil {
+		log.Printf("❌ Invalid Midtrans callback JSON: %v", err)
 		util.BadRequest(c, "Invalid notification format")
 		return
 	}
 
-	if err := h.paymentService.HandleMidtransCallback(notification); err != nil {
-		util.ErrorResponse(c, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
+	// Log raw notification for debugging
+	log.Printf("📥 Received Midtrans callback: %+v", notification)
 
-	util.SuccessResponse(c, http.StatusOK, "Callback processed successfully", nil)
+	// Process callback asynchronously to respond quickly to Midtrans
+	// Midtrans expects fast response (< 10 seconds)
+	go func() {
+		if err := h.paymentService.HandleMidtransCallback(notification); err != nil {
+			log.Printf("❌ Failed to process Midtrans callback: %v", err)
+			// Note: We still return 200 OK to Midtrans even if processing fails
+			// This prevents Midtrans from retrying immediately
+			// Error will be logged and can be retried manually or via background job
+		}
+	}()
+
+	// Respond immediately to Midtrans (within 10 seconds requirement)
+	// Status will be updated in background
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "ok",
+		"message": "Callback received",
+	})
 }
