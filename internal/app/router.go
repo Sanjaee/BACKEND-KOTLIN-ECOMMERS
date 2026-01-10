@@ -42,7 +42,16 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	}
 
 	// Auto migrate
-	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Product{}, &model.ProductImage{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.Category{},
+		&model.Product{},
+		&model.ProductImage{},
+		&model.Address{},
+		&model.Order{},
+		&model.OrderItem{},
+		&model.Payment{},
+	); err != nil {
 		panic("Failed to migrate database: " + err.Error())
 	}
 
@@ -50,6 +59,9 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	userRepo := repository.NewUserRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	productRepo := repository.NewProductRepository(db)
+	addressRepo := repository.NewAddressRepository(db)
+	orderRepo := repository.NewOrderRepository(db)
+	paymentRepo := repository.NewPaymentRepository(db)
 
 	// Initialize RabbitMQ with retry logic
 	rabbitMQ := initRabbitMQWithRetry(cfg)
@@ -93,11 +105,15 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	authService := service.NewAuthServiceWithConfig(userRepo, cfg.JWTSecret, rabbitMQ, cfg)
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, categoryRepo)
+	orderService := service.NewOrderService(orderRepo, productRepo, addressRepo)
+	paymentService := service.NewPaymentService(paymentRepo, orderRepo, cfg)
 
 	// Initialize handlers
 	authHandler := NewAuthHandler(authService, cfg.JWTSecret)
 	categoryHandler := NewCategoryHandler(categoryService)
 	productHandler := NewProductHandler(productService)
+	orderHandler := NewOrderHandler(orderService)
+	paymentHandler := NewPaymentHandler(paymentService)
 
 	// API routes
 	api := r.Group("/api/v1")
@@ -141,6 +157,31 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 			products.DELETE("/:id", productHandler.DeleteProduct)
 			products.POST("/:id/images", productHandler.AddProductImage)
 			products.DELETE("/images/:imageId", productHandler.DeleteProductImage)
+		}
+
+		// Order routes (protected)
+		orders := api.Group("/orders")
+		orders.Use(authHandler.AuthMiddleware())
+		{
+			orders.POST("", orderHandler.CreateOrder)
+			orders.GET("", orderHandler.GetOrders)
+			orders.GET("/:id", orderHandler.GetOrder)
+		}
+
+		// Payment routes
+		payments := api.Group("/payments")
+		{
+			// Public callback endpoint (no auth required)
+			payments.POST("/midtrans/callback", paymentHandler.MidtransCallback)
+
+			// Protected payment endpoints
+			payments.Use(authHandler.AuthMiddleware())
+			{
+				payments.POST("", paymentHandler.CreatePayment)
+				payments.GET("/:id", paymentHandler.GetPayment)
+				payments.GET("/order/:order_id", paymentHandler.GetPaymentByOrder)
+				payments.GET("/:id/status", paymentHandler.CheckPaymentStatus)
+			}
 		}
 	}
 

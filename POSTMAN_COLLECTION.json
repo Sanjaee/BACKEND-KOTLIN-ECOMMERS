@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "product-api-collection",
-		"name": "Product API Collection",
-		"description": "Collection untuk testing Product API endpoints",
+		"_postman_id": "ecommerce-api-collection",
+		"name": "E-Commerce API Collection",
+		"description": "Collection untuk testing E-Commerce API endpoints: Categories, Products, Orders, dan Payments",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -256,6 +256,171 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"shipping_address_id\": \"address-uuid-here\",\n  \"items\": [\n    {\n      \"product_id\": \"product-uuid-here\",\n      \"quantity\": 1\n    }\n  ],\n  \"subtotal\": 15000000,\n  \"shipping_cost\": 7000,\n  \"insurance_cost\": 300,\n  \"warranty_cost\": 1100,\n  \"service_fee\": 1000,\n  \"application_fee\": 0,\n  \"total_discount\": 10500,\n  \"bonus\": 1700,\n  \"notes\": \"Tolong dikirim dengan hati-hati\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "10"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders", ":id"],
+							"variable": [
+								{"key": "id", "value": "order-uuid-here"}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"item": [
+				{
+					"name": "Create Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_id\": \"order-uuid-here\",\n  \"payment_method\": \"bank_transfer\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments"]
+						}
+					},
+					"description": "Payment methods: bank_transfer, gopay, credit_card, qris, alfamart"
+				},
+				{
+					"name": "Get Payment by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments", ":id"],
+							"variable": [
+								{"key": "id", "value": "payment-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Payment by Order ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments/order/:order_id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments", "order", ":order_id"],
+							"variable": [
+								{"key": "order_id", "value": "order-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Check Payment Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments/:id/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments", ":id", "status"],
+							"variable": [
+								{"key": "id", "value": "payment-uuid-here"}
+							]
+						}
+					},
+					"description": "Check payment status and sync with Midtrans if available"
+				},
+				{
+					"name": "Midtrans Callback (Webhook)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"transaction_time\": \"2024-01-10 13:00:00\",\n  \"transaction_status\": \"settlement\",\n  \"transaction_id\": \"midtrans-transaction-id\",\n  \"status_message\": \"midtrans payment notification\",\n  \"status_code\": \"200\",\n  \"signature_key\": \"signature-key\",\n  \"payment_type\": \"bank_transfer\",\n  \"order_id\": \"ORD-20240110-130000-XXXX\",\n  \"merchant_id\": \"merchant-id\",\n  \"gross_amount\": \"15000.00\",\n  \"fraud_status\": \"accept\",\n  \"currency\": \"IDR\",\n  \"va_numbers\": [\n    {\n      \"va_number\": \"1234567890\",\n      \"bank\": \"bca\"\n    }\n  ],\n  \"expiry_time\": \"2024-01-11 13:00:00\",\n  \"qr_code_url\": \"https://example.com/qr-code.png\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments/midtrans/callback",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments", "midtrans", "callback"]
+						}
+					},
+					"description": "This is the webhook endpoint for Midtrans payment notifications. No authentication required."
+				}
+			]
 		}
 	],
 	"variable": [
@@ -263,6 +428,12 @@
 			"key": "base_url",
 			"value": "http://localhost:5000",
 			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string",
+			"description": "JWT token dari endpoint login. Set otomatis setelah login."
 		}
 	]
 }

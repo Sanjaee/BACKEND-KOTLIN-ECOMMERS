@@ -52,6 +52,10 @@ type Config struct {
 	RateLimitEnabled bool
 	RateLimitRPS     int // Requests per second
 	RateLimitBurst   int // Burst size
+
+	// Midtrans Payment Gateway
+	MidtransServerKey string
+	MidtransClientKey string
 }
 
 func Load() (*Config, error) {
@@ -103,6 +107,10 @@ func Load() (*Config, error) {
 		RateLimitEnabled: getEnvBool("RATE_LIMIT_ENABLED", true),
 		RateLimitRPS:     getEnvInt("RATE_LIMIT_RPS", 100),
 		RateLimitBurst:   getEnvInt("RATE_LIMIT_BURST", 200),
+
+		// Midtrans Payment Gateway
+		MidtransServerKey: getEnv("MIDTRANS_SERVER_KEY", "SB-Mid-server-4zIt7djwCeRdMpgF4gXDjciC"),
+		MidtransClientKey: getEnv("MIDTRANS_CLIENT_KEY", ""),
 	}
 
 	// Build database URL if not provided
