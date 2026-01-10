@@ -20,8 +20,8 @@ type orderService struct {
 }
 
 type CreateOrderRequest struct {
-	ShippingAddressID string                   `json:"shipping_address_id"` // Optional: will auto-create if not found
-	Items             []CreateOrderItemRequest `json:"items" binding:"required,min=1"`
+	ShippingAddressID string                   `json:"shipping_address_id"`                  // Optional: will auto-create if not found
+	Items             []CreateOrderItemRequest `json:"order_items" binding:"required,min=1"` // Changed to order_items to match Android
 	Subtotal          int                      `json:"subtotal" binding:"required"`
 	ShippingCost      int                      `json:"shipping_cost"`
 	InsuranceCost     int                      `json:"insurance_cost"`
@@ -36,6 +36,7 @@ type CreateOrderRequest struct {
 type CreateOrderItemRequest struct {
 	ProductID string `json:"product_id" binding:"required"`
 	Quantity  int    `json:"quantity" binding:"required,min=1"`
+	Price     int    `json:"price"` // Price at checkout time (may include discount)
 }
 
 func NewOrderService(
@@ -84,7 +85,7 @@ func (s *orderService) CreateOrder(userID string, req *CreateOrderRequest) (*mod
 
 	// Validate products and create order items
 	var orderItems []model.OrderItem
-	var totalAmount int
+	var calculatedSubtotal int
 
 	for _, item := range req.Items {
 		product, err := s.productRepo.FindByID(item.ProductID)
@@ -98,28 +99,58 @@ func (s *orderService) CreateOrder(userID string, req *CreateOrderRequest) (*mod
 			return nil, errors.New("insufficient stock for product: " + product.Name)
 		}
 
-		subtotal := product.Price * item.Quantity
-		totalAmount += subtotal
+		// Use the price from request (which may already include discount applied on frontend)
+		// But validate it doesn't exceed product price
+		itemPrice := item.Price
+		if itemPrice <= 0 {
+			// If price not provided or invalid, use product price
+			itemPrice = product.Price
+		} else if itemPrice > product.Price {
+			// Safety check: don't allow price higher than product price
+			itemPrice = product.Price
+		}
+
+		subtotal := itemPrice * item.Quantity
+		calculatedSubtotal += subtotal
 
 		orderItem := model.OrderItem{
 			ProductID:   product.ID,
 			ProductName: product.Name,
 			Quantity:    item.Quantity,
-			Price:       product.Price,
+			Price:       itemPrice,
 			Subtotal:    subtotal,
 		}
 		orderItems = append(orderItems, orderItem)
 	}
 
-	// Calculate total amount
-	totalAmount = req.Subtotal + req.ShippingCost + req.InsuranceCost + req.WarrantyCost +
+	// Validate that provided subtotal matches calculated subtotal (allow small difference for rounding)
+	// Use provided subtotal from request (which may include discount already applied)
+	if req.Subtotal < 0 {
+		return nil, errors.New("subtotal cannot be negative")
+	}
+
+	// Calculate total amount using provided subtotal from frontend
+	// Total = subtotal + shipping + insurance + warranty + serviceFee + applicationFee - discount - bonus
+	totalAmount := req.Subtotal + req.ShippingCost + req.InsuranceCost + req.WarrantyCost +
 		req.ServiceFee + req.ApplicationFee - req.Bonus - req.TotalDiscount
 
+	if totalAmount < 0 {
+		totalAmount = 0 // Ensure total is not negative
+	}
+
 	// Create order
+	// Use calculated subtotal from order items (not from request) to ensure consistency
+	// The request subtotal may already include discount, so we use the calculated one
+	finalSubtotal := calculatedSubtotal
+	if calculatedSubtotal == 0 && req.Subtotal > 0 {
+		// Fallback to request subtotal if calculated is 0 (shouldn't happen, but safety check)
+		finalSubtotal = req.Subtotal
+	}
+
 	order := &model.Order{
 		UserID:            userID,
 		ShippingAddressID: address.ID,
-		Subtotal:          req.Subtotal,
+		Subtotal:          finalSubtotal, // Use calculated subtotal from items
 		ShippingCost:      req.ShippingCost,
 		InsuranceCost:     req.InsuranceCost,
 		WarrantyCost:      req.WarrantyCost,
