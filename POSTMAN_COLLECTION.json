@@ -1,0 +1,146 @@
+{
+	"info": {
+		"_postman_id": "product-api-collection",
+		"name": "Product API Collection",
+		"description": "Collection untuk testing Product API endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/products?page=1&limit=10&active_only=true",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "10"},
+								{"key": "category_id", "value": "", "disabled": true},
+								{"key": "featured", "value": "", "disabled": true},
+								{"key": "active_only", "value": "true"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Product by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", ":id"],
+							"variable": [
+								{"key": "id", "value": "product-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"category_id\": \"category-uuid-here\",\n  \"name\": \"Laptop Gaming ASUS ROG\",\n  \"description\": \"Laptop gaming dengan processor Intel i7 dan GPU RTX 4060\",\n  \"sku\": \"LAP-ASUS-ROG-001\",\n  \"price\": 15000000,\n  \"stock\": 10,\n  \"weight\": 2500,\n  \"thumbnail\": \"https://example.com/images/laptop-asus-rog.jpg\",\n  \"is_active\": true,\n  \"is_featured\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/products",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products"]
+						}
+					}
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Laptop Gaming ASUS ROG Updated\",\n  \"price\": 14500000,\n  \"stock\": 8,\n  \"is_featured\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", ":id"],
+							"variable": [
+								{"key": "id", "value": "product-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", ":id"],
+							"variable": [
+								{"key": "id", "value": "product-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Add Product Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"image_url\": \"https://example.com/images/product-detail-1.jpg\",\n  \"sort_order\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/:id/images",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", ":id", "images"],
+							"variable": [
+								{"key": "id", "value": "product-uuid-here"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Product Image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/images/:imageId",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", "images", ":imageId"],
+							"variable": [
+								{"key": "imageId", "value": "image-uuid-here"}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	]
+}

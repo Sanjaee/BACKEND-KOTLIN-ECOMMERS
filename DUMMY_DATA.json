@@ -1,0 +1,166 @@
+{
+  "categories": [
+    {
+      "name": "Elektronik",
+      "description": "Perangkat elektronik dan gadget",
+      "slug": "elektronik",
+      "image_url": "https://example.com/images/category/elektronik.jpg",
+      "is_active": true
+    },
+    {
+      "name": "Fashion",
+      "description": "Pakaian dan aksesoris fashion",
+      "slug": "fashion",
+      "image_url": "https://example.com/images/category/fashion.jpg",
+      "is_active": true
+    },
+    {
+      "name": "Makanan & Minuman",
+      "description": "Makanan dan minuman segar",
+      "slug": "makanan-minuman",
+      "image_url": "https://example.com/images/category/makanan.jpg",
+      "is_active": true
+    },
+    {
+      "name": "Laptop",
+      "description": "Laptop dan komputer",
+      "slug": "laptop",
+      "parent_id": "elektronik-uuid",
+      "image_url": "https://example.com/images/category/laptop.jpg",
+      "is_active": true
+    },
+    {
+      "name": "Smartphone",
+      "description": "Smartphone dan aksesoris",
+      "slug": "smartphone",
+      "parent_id": "elektronik-uuid",
+      "image_url": "https://example.com/images/category/smartphone.jpg",
+      "is_active": true
+    }
+  ],
+  "products": [
+    {
+      "category_id": "laptop-uuid",
+      "name": "Laptop Gaming ASUS ROG Strix G16",
+      "description": "Laptop gaming dengan processor Intel Core i7-13650HX, GPU NVIDIA RTX 4060 8GB, RAM 16GB DDR5, SSD 512GB, Layar 16 inch FHD 165Hz",
+      "sku": "LAP-ASUS-ROG-G16-001",
+      "price": 18500000,
+      "stock": 15,
+      "weight": 2500,
+      "thumbnail": "https://example.com/images/products/laptop-asus-rog-strix.jpg",
+      "is_active": true,
+      "is_featured": true
+    },
+    {
+      "category_id": "laptop-uuid",
+      "name": "MacBook Pro 14 inch M3 Pro",
+      "description": "MacBook Pro dengan chip M3 Pro, RAM 18GB, SSD 512GB, Layar Liquid Retina XDR 14.2 inch",
+      "sku": "LAP-APPLE-MBP-14-M3-001",
+      "price": 35000000,
+      "stock": 8,
+      "weight": 1600,
+      "thumbnail": "https://example.com/images/products/macbook-pro-14-m3.jpg",
+      "is_active": true,
+      "is_featured": true
+    },
+    {
+      "category_id": "smartphone-uuid",
+      "name": "iPhone 15 Pro Max 256GB",
+      "description": "iPhone 15 Pro Max dengan chip A17 Pro, kamera 48MP, layar Super Retina XDR 6.7 inch, storage 256GB",
+      "sku": "HP-APPLE-IP15PM-256-001",
+      "price": 21999000,
+      "stock": 20,
+      "weight": 221,
+      "thumbnail": "https://example.com/images/products/iphone-15-pro-max.jpg",
+      "is_active": true,
+      "is_featured": true
+    },
+    {
+      "category_id": "smartphone-uuid",
+      "name": "Samsung Galaxy S24 Ultra 512GB",
+      "description": "Samsung Galaxy S24 Ultra dengan Snapdragon 8 Gen 3, kamera 200MP, layar Dynamic AMOLED 2X 6.8 inch, S Pen included",
+      "sku": "HP-SAMSUNG-S24U-512-001",
+      "price": 19999000,
+      "stock": 12,
+      "weight": 233,
+      "thumbnail": "https://example.com/images/products/samsung-s24-ultra.jpg",
+      "is_active": true,
+      "is_featured": false
+    },
+    {
+      "category_id": "fashion-uuid",
+      "name": "Kemeja Formal Pria Premium",
+      "description": "Kemeja formal pria dengan bahan cotton premium, cocok untuk acara formal dan kerja",
+      "sku": "FSH-KEMEJA-FORMAL-001",
+      "price": 450000,
+      "stock": 50,
+      "weight": 300,
+      "thumbnail": "https://example.com/images/products/kemeja-formal-pria.jpg",
+      "is_active": true,
+      "is_featured": false
+    },
+    {
+      "category_id": "fashion-uuid",
+      "name": "Sepatu Sneakers Running",
+      "description": "Sepatu sneakers untuk lari dengan teknologi cushioned, sol anti slip, ukuran 38-45",
+      "sku": "FSH-SEPATU-SNK-RUN-001",
+      "price": 899000,
+      "stock": 30,
+      "weight": 400,
+      "thumbnail": "https://example.com/images/products/sepatu-sneakers-running.jpg",
+      "is_active": true,
+      "is_featured": true
+    },
+    {
+      "category_id": "makanan-minuman-uuid",
+      "name": "Kopi Arabika Aceh Gayo 250gr",
+      "description": "Kopi arabika premium dari Aceh Gayo, kemasan 250gr, biji utuh siap disangrai",
+      "sku": "FD-KOPI-ARAB-GAYO-250",
+      "price": 125000,
+      "stock": 100,
+      "weight": 250,
+      "thumbnail": "https://example.com/images/products/kopi-arabika-gayo.jpg",
+      "is_active": true,
+      "is_featured": false
+    },
+    {
+      "category_id": "makanan-minuman-uuid",
+      "name": "Madu Hutan Asli 500gr",
+      "description": "Madu hutan asli murni tanpa campuran, kemasan botol kaca 500gr, halal certified",
+      "sku": "FD-MADU-HUTAN-500",
+      "price": 180000,
+      "stock": 75,
+      "weight": 600,
+      "thumbnail": "https://example.com/images/products/madu-hutan.jpg",
+      "is_active": true,
+      "is_featured": true
+    }
+  ],
+  "product_images": [
+    {
+      "product_id": "product-uuid-1",
+      "image_url": "https://example.com/images/products/laptop-asus-rog-detail-1.jpg",
+      "sort_order": 1
+    },
+    {
+      "product_id": "product-uuid-1",
+      "image_url": "https://example.com/images/products/laptop-asus-rog-detail-2.jpg",
+      "sort_order": 2
+    },
+    {
+      "product_id": "product-uuid-1",
+      "image_url": "https://example.com/images/products/laptop-asus-rog-detail-3.jpg",
+      "sort_order": 3
+    },
+    {
+      "product_id": "product-uuid-2",
+      "image_url": "https://example.com/images/products/macbook-pro-detail-1.jpg",
+      "sort_order": 1
+    },
+    {
+      "product_id": "product-uuid-2",
+      "image_url": "https://example.com/images/products/macbook-pro-detail-2.jpg",
+      "sort_order": 2
+    }
+  ]
+}
