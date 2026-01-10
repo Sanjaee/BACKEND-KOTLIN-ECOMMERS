@@ -29,7 +29,7 @@ func (r *categoryRepository) Create(category *model.Category) error {
 
 func (r *categoryRepository) FindByID(id string) (*model.Category, error) {
 	var category model.Category
-	err := r.db.Where("id = ?", id).First(&category).Error
+	err := r.db.Preload("Parent").Preload("Children").Where("id = ?", id).First(&category).Error
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (r *categoryRepository) FindByID(id string) (*model.Category, error) {
 
 func (r *categoryRepository) FindBySlug(slug string) (*model.Category, error) {
 	var category model.Category
-	err := r.db.Where("slug = ?", slug).First(&category).Error
+	err := r.db.Preload("Parent").Preload("Children").Where("slug = ?", slug).First(&category).Error
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (r *categoryRepository) FindBySlug(slug string) (*model.Category, error) {
 
 func (r *categoryRepository) FindAll(activeOnly bool) ([]model.Category, error) {
 	var categories []model.Category
-	query := r.db
+	query := r.db.Preload("Parent").Preload("Children")
 	if activeOnly {
 		query = query.Where("is_active = ?", true)
 	}

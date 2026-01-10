@@ -91,10 +91,12 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 
 	// Initialize services
 	authService := service.NewAuthServiceWithConfig(userRepo, cfg.JWTSecret, rabbitMQ, cfg)
+	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, categoryRepo)
 
 	// Initialize handlers
 	authHandler := NewAuthHandler(authService, cfg.JWTSecret)
+	categoryHandler := NewCategoryHandler(categoryService)
 	productHandler := NewProductHandler(productService)
 
 	// API routes
@@ -116,6 +118,17 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 
 			// Protected routes
 			auth.GET("/me", authHandler.AuthMiddleware(), authHandler.GetMe)
+		}
+
+		// Category routes
+		categories := api.Group("/categories")
+		{
+			categories.GET("", categoryHandler.GetCategories)
+			categories.GET("/:id", categoryHandler.GetCategory)
+			categories.GET("/slug/:slug", categoryHandler.GetCategoryBySlug)
+			categories.POST("", categoryHandler.CreateCategory)
+			categories.PUT("/:id", categoryHandler.UpdateCategory)
+			categories.DELETE("/:id", categoryHandler.DeleteCategory)
 		}
 
 		// Product routes
