@@ -51,8 +51,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      # RabbitMQ is optional - app can work without it
+      # rabbitmq will start independently and app will reconnect when available
     networks:
       - yourapp_network
     restart: unless-stopped
@@ -122,6 +122,7 @@ services:
 
   rabbitmq:
     # Gunakan image tanpa management UI untuk hemat memory
+    # Note: RabbitMQ is optional - app will work without it (emails will log warnings)
     image: rabbitmq:3-alpine
     container_name: yourapp_rabbitmq
     environment:
@@ -142,15 +143,17 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 3
+      start_period: 90s
     mem_limit: 200m
     mem_reservation: 120m
+    # Restart policy untuk auto-recovery
+    restart: unless-stopped
     # Tambahkan ulimits untuk mencegah error
     ulimits:
       nofile:
-        soft: 65536
-        hard: 65536
+        soft: 32768
+        hard: 32768
 
   # pgweb:
   #   image: sosedoff/pgweb:latest
