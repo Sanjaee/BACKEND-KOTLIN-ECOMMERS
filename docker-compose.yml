@@ -129,6 +129,7 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-password123}
       # Optimasi untuk low memory
       RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.3
+      RABBITMQ_DISK_FREE_LIMIT: "100MB"
     ports:
       - "5672:5672"   # AMQP port
       # Management UI dihapus untuk hemat memory
@@ -136,13 +137,20 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - yourapp_network
+    # Healthcheck dengan command yang lebih sederhana
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
       retries: 5
-    mem_limit: 150m
-    mem_reservation: 100m
+      start_period: 60s
+    mem_limit: 200m
+    mem_reservation: 120m
+    # Tambahkan ulimits untuk mencegah error
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # pgweb:
   #   image: sosedoff/pgweb:latest
