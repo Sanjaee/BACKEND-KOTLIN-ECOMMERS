@@ -51,13 +51,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # RabbitMQ is optional - app can work without it
-      # rabbitmq will start independently and app will reconnect when available
+      rabbitmq:
+        condition: service_healthy
     networks:
       - yourapp_network
     restart: unless-stopped
-    mem_limit: 300m
-    mem_reservation: 200m
 
   db:
     image: postgres:15-alpine
@@ -66,26 +64,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-yourapp_db}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
       POSTGRES_DB: ${POSTGRES_DB:-yourapp}
-      # Optimasi untuk low memory
-      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    command: >
-      postgres
-      -c shared_buffers=50MB
-      -c effective_cache_size=150MB
-      -c maintenance_work_mem=20MB
-      -c work_mem=2MB
-      -c max_connections=20
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=1MB
-      -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c min_wal_size=80MB
-      -c max_wal_size=200MB
     networks:
       - yourapp_network
     healthcheck:
@@ -93,8 +75,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    mem_limit: 200m
-    mem_reservation: 150m
 
   redis:
     image: redis:7-alpine
@@ -110,50 +90,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # Optimasi untuk low memory - disable AOF untuk hemat memory
-    command: >
-      redis-server
-      --maxmemory 80mb
-      --maxmemory-policy allkeys-lru
-      --save ""
-      --appendonly no
-    mem_limit: 100m
-    mem_reservation: 80m
+    command: redis-server --appendonly yes
 
   rabbitmq:
-    # Gunakan image tanpa management UI untuk hemat memory
-    # Note: RabbitMQ is optional - app will work without it (emails will log warnings)
-    image: rabbitmq:3-alpine
+    image: rabbitmq:3-management-alpine
     container_name: yourapp_rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-yourapp}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-password123}
-      # Optimasi untuk low memory
-      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.3
-      RABBITMQ_DISK_FREE_LIMIT: "100MB"
     ports:
       - "5672:5672"   # AMQP port
-      # Management UI dihapus untuk hemat memory
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - yourapp_network
-    # Healthcheck dengan command yang lebih sederhana
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
-    mem_limit: 200m
-    mem_reservation: 120m
-    # Restart policy untuk auto-recovery
-    restart: unless-stopped
-    # Tambahkan ulimits untuk mencegah error
-    ulimits:
-      nofile:
-        soft: 32768
-        hard: 32768
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # pgweb:
   #   image: sosedoff/pgweb:latest
