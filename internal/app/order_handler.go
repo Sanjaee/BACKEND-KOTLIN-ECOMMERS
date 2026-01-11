@@ -70,7 +70,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 }
 
 // GetOrders handles getting list of orders for authenticated user
-// GET /api/v1/orders
+// GET /api/v1/orders?page=1&limit=10&status=pending&payment_status=success
 func (h *OrderHandler) GetOrders(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get("userID")
@@ -81,8 +81,10 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	status := c.Query("status")                // Optional: filter by order status (pending, processing, shipped, delivered, cancelled)
+	paymentStatus := c.Query("payment_status") // Optional: filter by payment status (pending, success, failed, cancelled, expired)
 
-	orders, total, err := h.orderService.GetOrdersByUserID(userID.(string), page, limit)
+	orders, total, err := h.orderService.GetOrdersByUserID(userID.(string), page, limit, status, paymentStatus)
 	if err != nil {
 		util.ErrorResponse(c, http.StatusInternalServerError, err.Error(), nil)
 		return

@@ -9,7 +9,7 @@ import (
 type OrderService interface {
 	CreateOrder(userID string, req *CreateOrderRequest) (*model.Order, error)
 	GetOrderByID(orderID string, userID string) (*model.Order, error)
-	GetOrdersByUserID(userID string, page, limit int) ([]model.Order, int64, error)
+	GetOrdersByUserID(userID string, page, limit int, status, paymentStatus string) ([]model.Order, int64, error)
 	UpdateOrderStatus(orderID string, status string) error
 }
 
@@ -191,14 +191,14 @@ func (s *orderService) GetOrderByID(orderID string, userID string) (*model.Order
 	return order, nil
 }
 
-func (s *orderService) GetOrdersByUserID(userID string, page, limit int) ([]model.Order, int64, error) {
+func (s *orderService) GetOrdersByUserID(userID string, page, limit int, status, paymentStatus string) ([]model.Order, int64, error) {
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 {
 		limit = 10
 	}
-	return s.orderRepo.FindByUserID(userID, page, limit)
+	return s.orderRepo.FindByUserID(userID, page, limit, status, paymentStatus)
 }
 
 func (s *orderService) UpdateOrderStatus(orderID string, status string) error {

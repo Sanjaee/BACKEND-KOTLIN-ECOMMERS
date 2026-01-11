@@ -10,7 +10,7 @@ type OrderRepository interface {
 	Create(order *model.Order) error
 	FindByID(id string) (*model.Order, error)
 	FindByOrderNumber(orderNumber string) (*model.Order, error)
-	FindByUserID(userID string, page, limit int) ([]model.Order, int64, error)
+	FindByUserID(userID string, page, limit int, status, paymentStatus string) ([]model.Order, int64, error)
 	Update(order *model.Order) error
 	UpdateStatus(orderID string, status string) error
 }
@@ -55,25 +55,56 @@ func (r *orderRepository) FindByOrderNumber(orderNumber string) (*model.Order, e
 	return &order, nil
 }
 
-func (r *orderRepository) FindByUserID(userID string, page, limit int) ([]model.Order, int64, error) {
+func (r *orderRepository) FindByUserID(userID string, page, limit int, status, paymentStatus string) ([]model.Order, int64, error) {
 	var orders []model.Order
 	var total int64
 
 	offset := (page - 1) * limit
 
-	query := r.db.Where("user_id = ?", userID)
+	// Base query with user_id filter
+	query := r.db.Where("orders.user_id = ?", userID)
+
+	// Filter by order status if provided
+	if status != "" {
+		validStatuses := map[string]bool{
+			"pending":    true,
+			"processing": true,
+			"shipped":    true,
+			"delivered":  true,
+			"cancelled":  true,
+		}
+		if validStatuses[status] {
+			query = query.Where("orders.status = ?", status)
+		}
+	}
+
+	// Filter by payment status if provided
+	if paymentStatus != "" {
+		validPaymentStatuses := map[string]bool{
+			"pending":   true,
+			"success":   true,
+			"failed":    true,
+			"cancelled": true,
+			"expired":   true,
+		}
+		if validPaymentStatuses[paymentStatus] {
+			// Join with payments table to filter by payment status
+			query = query.Joins("LEFT JOIN payments ON payments.order_uuid = orders.id").
+				Where("payments.status = ?", paymentStatus)
+		}
+	}
 
 	// Count total
 	if err := query.Model(&model.Order{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch orders
+	// Fetch orders with preloads
 	err := query.Preload("ShippingAddress").
 		Preload("OrderItems").
 		Preload("OrderItems.Product").
 		Preload("Payment").
-		Order("created_at DESC").
+		Order("orders.created_at DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&orders).Error

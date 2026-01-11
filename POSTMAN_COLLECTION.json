@@ -287,14 +287,78 @@
 							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10",
+							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10&status=&payment_status=",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders"],
+							"query": [
+								{"key": "page", "value": "1", "description": "Page number (default: 1)"},
+								{"key": "limit", "value": "10", "description": "Items per page (default: 10)"},
+								{"key": "status", "value": "", "description": "Filter by order status: pending, processing, shipped, delivered, cancelled", "disabled": true},
+								{"key": "payment_status", "value": "", "description": "Filter by payment status: pending, success, failed, cancelled, expired", "disabled": true}
+							]
+						},
+						"description": "Get list of orders for authenticated user. Supports filtering by order status and payment status."
+					}
+				},
+				{
+					"name": "Get Orders by Status (Pending)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10&status=pending",
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "orders"],
 							"query": [
 								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "10"}
+								{"key": "limit", "value": "10"},
+								{"key": "status", "value": "pending", "description": "Filter by order status"}
 							]
-						}
+						},
+						"description": "Get orders with status: pending, processing, shipped, delivered, cancelled"
+					}
+				},
+				{
+					"name": "Get Orders by Payment Status (Success)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10&payment_status=success",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "10"},
+								{"key": "payment_status", "value": "success", "description": "Filter by payment status"}
+							]
+						},
+						"description": "Get orders with payment status: pending, success, failed, cancelled, expired"
+					}
+				},
+				{
+					"name": "Get Orders by Status and Payment Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/orders?page=1&limit=10&status=delivered&payment_status=success",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "orders"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "10"},
+								{"key": "status", "value": "delivered", "description": "Filter by order status"},
+								{"key": "payment_status", "value": "success", "description": "Filter by payment status"}
+							]
+						},
+						"description": "Get orders filtered by both order status and payment status"
 					}
 				},
 				{
