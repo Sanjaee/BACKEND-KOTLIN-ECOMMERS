@@ -115,7 +115,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	authHandler := NewAuthHandler(authService, cfg.JWTSecret)
 	sellerHandler := NewSellerHandler(sellerService)
 	categoryHandler := NewCategoryHandler(categoryService)
-	productHandler := NewProductHandler(productService)
+	productHandler := NewProductHandler(productService, cfg)
 	orderHandler := NewOrderHandler(orderService)
 	paymentHandler := NewPaymentHandler(paymentService)
 
@@ -145,7 +145,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		{
 			// Public: Get seller by ID
 			sellers.GET("/:id", sellerHandler.GetSeller)
-			
+
 			// Protected: CRUD operations (requires auth)
 			sellersProtected := sellers.Group("")
 			sellersProtected.Use(authHandler.AuthMiddleware())
@@ -173,7 +173,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		{
 			products.GET("", productHandler.GetProducts)
 			products.GET("/:id", productHandler.GetProduct)
-			
+
 			// Protected routes (requires auth)
 			productsProtected := products.Group("")
 			productsProtected.Use(authHandler.AuthMiddleware())
@@ -182,6 +182,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 				productsProtected.PUT("/:id", productHandler.UpdateProduct)
 				productsProtected.DELETE("/:id", productHandler.DeleteProduct)
 				productsProtected.POST("/:id/images", productHandler.AddProductImage)
+				productsProtected.POST("/:id/images/upload", productHandler.UploadMultipleProductImages)
 				productsProtected.DELETE("/images/:imageId", productHandler.DeleteProductImage)
 			}
 		}

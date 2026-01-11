@@ -224,7 +224,8 @@
 					"request": {
 						"method": "POST",
 						"header": [
-							{"key": "Content-Type", "value": "application/json"}
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
 						],
 						"body": {
 							"mode": "raw",
@@ -238,13 +239,51 @@
 								{"key": "id", "value": "product-uuid-here"}
 							]
 						}
-					}
+					},
+					"description": "Add single product image by URL (requires authentication)"
+				},
+				{
+					"name": "Upload Multiple Product Images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images",
+									"type": "file",
+									"src": [],
+									"description": "Select multiple image files (JPEG, PNG, WEBP, GIF). Max 20 images, 5MB per image."
+								},
+								{
+									"key": "images",
+									"type": "file",
+									"src": [],
+									"description": "You can add multiple 'images' fields. Click 'Bulk Edit' to add more."
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/products/:id/images/upload",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "products", ":id", "images", "upload"],
+							"variable": [
+								{"key": "id", "value": "product-uuid-here"}
+							]
+						}
+					},
+					"description": "Upload multiple product images directly (max 20 images, 5MB per image). Images will be optimized and uploaded to Cloudinary. Supports JPEG, PNG, WEBP, GIF formats."
 				},
 				{
 					"name": "Delete Product Image",
 					"request": {
 						"method": "DELETE",
-						"header": [],
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
 						"url": {
 							"raw": "{{base_url}}/api/v1/products/images/:imageId",
 							"host": ["{{base_url}}"],

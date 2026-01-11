@@ -57,6 +57,11 @@ type Config struct {
 	// Midtrans Payment Gateway
 	MidtransServerKey string
 	MidtransClientKey string
+
+	// Cloudinary
+	CloudinaryCloudName string
+	CloudinaryAPIKey    string
+	CloudinaryAPISecret string
 }
 
 func Load() (*Config, error) {
@@ -125,6 +130,11 @@ func Load() (*Config, error) {
 		// Midtrans Payment Gateway
 		MidtransServerKey: getEnv("MIDTRANS_SERVER_KEY", "SB-Mid-server-4zIt7djwCeRdMpgF4gXDjciC"),
 		MidtransClientKey: getEnv("MIDTRANS_CLIENT_KEY", ""),
+
+		// Cloudinary
+		CloudinaryCloudName: getEnv("CLOUDINARY_CLOUD_NAME", "dgmlqboeq"),
+		CloudinaryAPIKey:    getEnv("CLOUDINARY_API_KEY", "736499913818945"),
+		CloudinaryAPISecret: getEnv("CLOUDINARY_API_SECRET", "pfFz2h0qhf8qTIEGWEjQQbqsYWk"),
 	}
 
 	// Build database URL if not provided

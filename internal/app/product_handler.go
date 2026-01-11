@@ -1,9 +1,14 @@
 package app
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
+	"yourapp/internal/config"
 	"yourapp/internal/service"
 	"yourapp/internal/util"
 
@@ -11,12 +16,19 @@ import (
 )
 
 type ProductHandler struct {
-	productService service.ProductService
+	productService   service.ProductService
+	cloudinaryUpload *util.CloudinaryUploader
 }
 
-func NewProductHandler(productService service.ProductService) *ProductHandler {
+func NewProductHandler(productService service.ProductService, cfg *config.Config) *ProductHandler {
+	var uploader *util.CloudinaryUploader
+	if cfg.CloudinaryCloudName != "" && cfg.CloudinaryAPIKey != "" && cfg.CloudinaryAPISecret != "" {
+		uploader = util.NewCloudinaryUploader(cfg.CloudinaryCloudName, cfg.CloudinaryAPIKey, cfg.CloudinaryAPISecret)
+	}
+
 	return &ProductHandler{
-		productService: productService,
+		productService:   productService,
+		cloudinaryUpload: uploader,
 	}
 }
 
@@ -172,4 +184,132 @@ func (h *ProductHandler) DeleteProductImage(c *gin.Context) {
 	}
 
 	util.SuccessResponse(c, http.StatusOK, "Image deleted successfully", nil)
+}
+
+// UploadMultipleProductImages handles uploading multiple images to Cloudinary and saving to database
+// POST /api/v1/products/:id/images/upload
+func (h *ProductHandler) UploadMultipleProductImages(c *gin.Context) {
+	productID := c.Param("id")
+	if productID == "" {
+		util.BadRequest(c, "Product ID is required")
+		return
+	}
+
+	// Validate product exists
+	_, err := h.productService.GetProductByID(productID)
+	if err != nil {
+		util.ErrorResponse(c, http.StatusBadRequest, "Product not found", nil)
+		return
+	}
+
+	if h.cloudinaryUpload == nil {
+		util.ErrorResponse(c, http.StatusInternalServerError, "Cloudinary is not configured", nil)
+		return
+	}
+
+	// Parse multipart form (max 20MB)
+	err = c.Request.ParseMultipartForm(20 << 20) // 20MB
+	if err != nil {
+		util.BadRequest(c, "Failed to parse multipart form: "+err.Error())
+		return
+	}
+
+	// Get files from form
+	files := c.Request.MultipartForm.File["images"]
+	if len(files) == 0 {
+		util.BadRequest(c, "No images provided")
+		return
+	}
+
+	// Limit to 20 images
+	if len(files) > 20 {
+		util.BadRequest(c, "Maximum 20 images allowed")
+		return
+	}
+
+	// Validate MIME types
+	allowedMIMETypes := map[string]bool{
+		"image/jpeg": true,
+		"image/jpg":  true,
+		"image/png":  true,
+		"image/webp": true,
+		"image/gif":  true,
+	}
+
+	var fileDataList []util.FileData
+	for _, fileHeader := range files {
+		// Validate MIME type
+		contentType := fileHeader.Header.Get("Content-Type")
+		if contentType == "" {
+			// Try to detect from filename
+			ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+			mimeMap := map[string]string{
+				".jpg":  "image/jpeg",
+				".jpeg": "image/jpeg",
+				".png":  "image/png",
+				".webp": "image/webp",
+				".gif":  "image/gif",
+			}
+			if m, ok := mimeMap[ext]; ok {
+				contentType = m
+			}
+		}
+
+		if !allowedMIMETypes[contentType] {
+			util.BadRequest(c, fmt.Sprintf("File %s has invalid image format. Allowed: JPEG, PNG, WEBP, GIF", fileHeader.Filename))
+			return
+		}
+
+		// Open file
+		file, err := fileHeader.Open()
+		if err != nil {
+			util.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Failed to open file %s: %s", fileHeader.Filename, err.Error()), nil)
+			return
+		}
+
+		// Read file data
+		fileData, err := io.ReadAll(file)
+		file.Close()
+		if err != nil {
+			util.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Failed to read file %s: %s", fileHeader.Filename, err.Error()), nil)
+			return
+		}
+
+		// Validate file size (max 5MB per image)
+		if len(fileData) > 5<<20 {
+			util.BadRequest(c, fmt.Sprintf("File %s exceeds 5MB limit", fileHeader.Filename))
+			return
+		}
+
+		fileDataList = append(fileDataList, util.FileData{
+			Data: fileData,
+			Name: fileHeader.Filename,
+		})
+	}
+
+	// Upload to Cloudinary
+	folder := fmt.Sprintf("products/%s", productID)
+	urls, err := h.cloudinaryUpload.UploadMultipleImages(fileDataList, folder, 20)
+	if err != nil {
+		util.ErrorResponse(c, http.StatusInternalServerError, "Failed to upload images: "+err.Error(), nil)
+		return
+	}
+
+	// Save to database
+	for i, url := range urls {
+		req := service.AddProductImageRequest{
+			ImageURL:  url,
+			SortOrder: func() *int { v := i; return &v }(),
+		}
+		_, err := h.productService.AddProductImage(productID, req)
+		if err != nil {
+			util.ErrorResponse(c, http.StatusInternalServerError, fmt.Sprintf("Failed to save image %d: %s", i+1, err.Error()), nil)
+			return
+		}
+	}
+
+	util.SuccessResponse(c, http.StatusCreated, fmt.Sprintf("%d images uploaded successfully", len(urls)), gin.H{
+		"images": urls,
+		"count":  len(urls),
+	})
 }
