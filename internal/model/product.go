@@ -9,6 +9,7 @@ import (
 
 type Product struct {
 	ID          string         `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	SellerID    string         `gorm:"type:uuid;not null;index" json:"seller_id"`
 	CategoryID  string         `gorm:"type:uuid;not null;index" json:"category_id"`
 	Name        string         `gorm:"type:varchar(255);not null" json:"name"`
 	Description *string        `gorm:"type:text" json:"description,omitempty"`
@@ -23,6 +24,7 @@ type Product struct {
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
+	Seller        Seller         `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
 	Category      Category       `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	ProductImages []ProductImage `gorm:"foreignKey:ProductID" json:"images,omitempty"`
 }

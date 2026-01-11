@@ -51,14 +51,16 @@ type OrderItem struct {
 	ID          string    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	OrderID     string    `gorm:"type:uuid;not null;index" json:"order_id"`
 	ProductID   string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	SellerID    string    `gorm:"type:uuid;not null;index" json:"seller_id"`
 	ProductName string    `gorm:"type:varchar(255);not null" json:"product_name"`
 	Quantity    int       `gorm:"not null" json:"quantity"`
 	Price       int       `gorm:"not null" json:"price"` // Price at time of order
 	Subtotal    int       `gorm:"not null" json:"subtotal"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 
-	Order   Order   `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Order   Order  `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Seller  Seller  `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
 }
 
 func (oi *OrderItem) BeforeCreate(tx *gorm.DB) error {

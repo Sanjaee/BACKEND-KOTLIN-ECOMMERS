@@ -115,6 +115,7 @@ func (s *orderService) CreateOrder(userID string, req *CreateOrderRequest) (*mod
 
 		orderItem := model.OrderItem{
 			ProductID:   product.ID,
+			SellerID:    product.SellerID,
 			ProductName: product.Name,
 			Quantity:    item.Quantity,
 			Price:       itemPrice,

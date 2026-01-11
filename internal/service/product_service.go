@@ -9,7 +9,7 @@ import (
 )
 
 type ProductService interface {
-	CreateProduct(req CreateProductRequest) (*model.Product, error)
+	CreateProduct(userID string, req CreateProductRequest) (*model.Product, error)
 	GetProductByID(id string) (*model.Product, error)
 	GetProducts(page, limit int, categoryID, featured, activeOnly *string) (*ProductListResponse, error)
 	UpdateProduct(id string, req UpdateProductRequest) (*model.Product, error)
@@ -21,6 +21,7 @@ type ProductService interface {
 type productService struct {
 	productRepo  repository.ProductRepository
 	categoryRepo repository.CategoryRepository
+	sellerRepo   repository.SellerRepository
 }
 
 type CreateProductRequest struct {
@@ -61,16 +62,23 @@ type ProductListResponse struct {
 	Limit    int             `json:"limit"`
 }
 
-func NewProductService(productRepo repository.ProductRepository, categoryRepo repository.CategoryRepository) ProductService {
+func NewProductService(productRepo repository.ProductRepository, categoryRepo repository.CategoryRepository, sellerRepo repository.SellerRepository) ProductService {
 	return &productService{
 		productRepo:  productRepo,
 		categoryRepo: categoryRepo,
+		sellerRepo:   sellerRepo,
 	}
 }
 
-func (s *productService) CreateProduct(req CreateProductRequest) (*model.Product, error) {
+func (s *productService) CreateProduct(userID string, req CreateProductRequest) (*model.Product, error) {
+	// Get seller by userID (1 user 1 toko)
+	seller, err := s.sellerRepo.FindByUserID(userID)
+	if err != nil {
+		return nil, errors.New("seller not found. Please create a shop first")
+	}
+
 	// Validate category exists
-	_, err := s.categoryRepo.FindByID(req.CategoryID)
+	_, err = s.categoryRepo.FindByID(req.CategoryID)
 	if err != nil {
 		return nil, errors.New("category not found")
 	}
@@ -92,6 +100,7 @@ func (s *productService) CreateProduct(req CreateProductRequest) (*model.Product
 	}
 
 	product := &model.Product{
+		SellerID:    seller.ID,
 		CategoryID:  req.CategoryID,
 		Name:        req.Name,
 		Description: req.Description,

@@ -44,6 +44,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	// Auto migrate
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.Seller{},
 		&model.Category{},
 		&model.Product{},
 		&model.ProductImage{},
@@ -57,6 +58,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
+	sellerRepo := repository.NewSellerRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	addressRepo := repository.NewAddressRepository(db)
@@ -103,13 +105,15 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 
 	// Initialize services
 	authService := service.NewAuthServiceWithConfig(userRepo, cfg.JWTSecret, rabbitMQ, cfg)
+	sellerService := service.NewSellerService(sellerRepo, userRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
-	productService := service.NewProductService(productRepo, categoryRepo)
+	productService := service.NewProductService(productRepo, categoryRepo, sellerRepo)
 	orderService := service.NewOrderService(orderRepo, productRepo, addressRepo)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, cfg)
 
 	// Initialize handlers
 	authHandler := NewAuthHandler(authService, cfg.JWTSecret)
+	sellerHandler := NewSellerHandler(sellerService)
 	categoryHandler := NewCategoryHandler(categoryService)
 	productHandler := NewProductHandler(productService)
 	orderHandler := NewOrderHandler(orderService)
@@ -136,6 +140,23 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 			auth.GET("/me", authHandler.AuthMiddleware(), authHandler.GetMe)
 		}
 
+		// Seller routes
+		sellers := api.Group("/sellers")
+		{
+			// Public: Get seller by ID
+			sellers.GET("/:id", sellerHandler.GetSeller)
+			
+			// Protected: CRUD operations (requires auth)
+			sellersProtected := sellers.Group("")
+			sellersProtected.Use(authHandler.AuthMiddleware())
+			{
+				sellersProtected.POST("", sellerHandler.CreateSeller)
+				sellersProtected.GET("/me", sellerHandler.GetMySeller)
+				sellersProtected.PUT("", sellerHandler.UpdateSeller)
+				sellersProtected.DELETE("", sellerHandler.DeleteSeller)
+			}
+		}
+
 		// Category routes
 		categories := api.Group("/categories")
 		{
@@ -152,11 +173,17 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		{
 			products.GET("", productHandler.GetProducts)
 			products.GET("/:id", productHandler.GetProduct)
-			products.POST("", productHandler.CreateProduct)
-			products.PUT("/:id", productHandler.UpdateProduct)
-			products.DELETE("/:id", productHandler.DeleteProduct)
-			products.POST("/:id/images", productHandler.AddProductImage)
-			products.DELETE("/images/:imageId", productHandler.DeleteProductImage)
+			
+			// Protected routes (requires auth)
+			productsProtected := products.Group("")
+			productsProtected.Use(authHandler.AuthMiddleware())
+			{
+				productsProtected.POST("", productHandler.CreateProduct)
+				productsProtected.PUT("/:id", productHandler.UpdateProduct)
+				productsProtected.DELETE("/:id", productHandler.DeleteProduct)
+				productsProtected.POST("/:id/images", productHandler.AddProductImage)
+				productsProtected.DELETE("/images/:imageId", productHandler.DeleteProductImage)
+			}
 		}
 
 		// Order routes (protected)

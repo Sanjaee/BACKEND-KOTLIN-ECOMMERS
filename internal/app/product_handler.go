@@ -23,13 +23,19 @@ func NewProductHandler(productService service.ProductService) *ProductHandler {
 // CreateProduct handles product creation
 // POST /api/v1/products
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		util.Unauthorized(c, "User not authenticated")
+		return
+	}
+
 	var req service.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		util.BadRequest(c, err.Error())
 		return
 	}
 
-	product, err := h.productService.CreateProduct(req)
+	product, err := h.productService.CreateProduct(userID.(string), req)
 	if err != nil {
 		util.ErrorResponse(c, http.StatusBadRequest, err.Error(), nil)
 		return

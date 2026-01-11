@@ -32,7 +32,7 @@ func (r *productRepository) Create(product *model.Product) error {
 
 func (r *productRepository) FindByID(id string) (*model.Product, error) {
 	var product model.Product
-	err := r.db.Preload("Category").Preload("ProductImages", func(db *gorm.DB) *gorm.DB {
+	err := r.db.Preload("Seller").Preload("Category").Preload("ProductImages", func(db *gorm.DB) *gorm.DB {
 		return db.Order("sort_order ASC")
 	}).Where("id = ?", id).First(&product).Error
 	if err != nil {

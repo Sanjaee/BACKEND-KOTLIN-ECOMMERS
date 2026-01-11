@@ -227,18 +227,17 @@ Aplikasi ini menggunakan **Clean Architecture** dengan layer separation:
 
 MIT
 
-
 // E-Commerce Database Schema
 // Copy this code to https://dbdiagram.io/
 
 Table users {
-  id uuid [pk, default: `gen_random_uuid()`]
+  id uuid [pk]
   email varchar(255) [not null, unique]
   username varchar(100) [unique]
   phone varchar(20)
   full_name varchar(255) [not null]
   password_hash varchar(255)
-  user_type varchar(50) [default: 'member']
+  user_type varchar(50) [default: 'member', note: 'member, seller, admin']
   profile_photo text
   date_of_birth date
   gender varchar(20)
@@ -251,103 +250,93 @@ Table users {
   otp_expires_at timestamp
   reset_token text
   reset_expires_at timestamp
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
+  created_at timestamp
+  updated_at timestamp
   deleted_at timestamp
-  
-  indexes {
-    email
-    username
-    google_id
-    deleted_at
-  }
+}
+
+Table sellers {
+  id uuid [pk]
+  user_id uuid [not null, unique, ref: - users.id]
+  shop_name varchar(255) [not null, unique]
+  shop_slug varchar(255) [not null, unique]
+  shop_description text
+  shop_logo text
+  shop_banner text
+  shop_address text
+  shop_city varchar(100)
+  shop_province varchar(100)
+  shop_phone varchar(20)
+  shop_email varchar(255)
+  is_verified boolean [default: false]
+  is_active boolean [default: true]
+  total_products int [default: 0]
+  total_sales int [default: 0]
+  rating_average decimal(3,2) [default: 0.00]
+  total_reviews int [default: 0]
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table categories {
-  id uuid [pk, default: `gen_random_uuid()`]
+  id uuid [pk]
   name varchar(255) [not null]
   description text
   slug varchar(255) [unique, not null]
   image_url text
-  parent_id uuid
+  parent_id uuid [ref: > categories.id]
   is_active boolean [default: true]
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    slug
-    parent_id
-  }
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table products {
-  id uuid [pk, default: `gen_random_uuid()`]
-  category_id uuid [not null]
+  id uuid [pk]
+  seller_id uuid [not null, ref: > sellers.id]
+  category_id uuid [not null, ref: > categories.id]
   name varchar(255) [not null]
   description text
   sku varchar(100) [unique, not null]
   price int [not null]
   stock int [default: 0]
-  weight int [note: 'in grams']
+  weight int
   thumbnail text
   is_active boolean [default: true]
   is_featured boolean [default: false]
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
+  created_at timestamp
+  updated_at timestamp
   deleted_at timestamp
-  
-  indexes {
-    category_id
-    sku
-    is_active
-    is_featured
-    deleted_at
-  }
 }
 
 Table product_images {
-  id uuid [pk, default: `gen_random_uuid()`]
-  product_id uuid [not null]
+  id uuid [pk]
+  product_id uuid [not null, ref: > products.id]
   image_url text [not null]
   sort_order int [default: 0]
-  created_at timestamp [default: `now()`]
-  
-  indexes {
-    product_id
-  }
+  created_at timestamp
 }
 
 Table carts {
-  id uuid [pk, default: `gen_random_uuid()`]
-  user_id uuid [not null, unique]
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    user_id
-  }
+  id uuid [pk]
+  user_id uuid [not null, unique, ref: - users.id]
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table cart_items {
-  id uuid [pk, default: `gen_random_uuid()`]
-  cart_id uuid [not null]
-  product_id uuid [not null]
+  id uuid [pk]
+  cart_id uuid [not null, ref: > carts.id]
+  product_id uuid [not null, ref: > products.id]
   quantity int [not null, default: 1]
   price int [not null]
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    cart_id
-    product_id
-    (cart_id, product_id) [unique]
-  }
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table addresses {
-  id uuid [pk, default: `gen_random_uuid()`]
-  user_id uuid [not null]
-  label varchar(100) [note: 'e.g., Home, Office']
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  label varchar(100)
   recipient_name varchar(255) [not null]
   phone varchar(20) [not null]
   address_line1 text [not null]
@@ -356,112 +345,66 @@ Table addresses {
   province varchar(100) [not null]
   postal_code varchar(10) [not null]
   is_default boolean [default: false]
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    user_id
-    is_default
-  }
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table orders {
-  id uuid [pk, default: `gen_random_uuid()`]
+  id uuid [pk]
   order_number varchar(50) [unique, not null]
-  user_id uuid [not null]
-  shipping_address_id uuid [not null]
+  user_id uuid [not null, ref: > users.id]
+  shipping_address_id uuid [not null, ref: > addresses.id]
   subtotal int [not null]
   shipping_cost int [default: 0]
   total_amount int [not null]
-  status varchar(50) [not null, default: 'pending', note: 'pending, processing, shipped, delivered, cancelled']
+  status varchar(50) [not null, default: 'pending']
   notes text
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    order_number
-    user_id
-    status
-    created_at
-  }
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table order_items {
-  id uuid [pk, default: `gen_random_uuid()`]
-  order_id uuid [not null]
-  product_id uuid [not null]
-  product_name varchar(255) [not null, note: 'snapshot of product name']
+  id uuid [pk]
+  order_id uuid [not null, ref: > orders.id]
+  product_id uuid [not null, ref: > products.id]
+  seller_id uuid [not null, ref: > sellers.id]
+  product_name varchar(255) [not null]
   quantity int [not null]
-  price int [not null, note: 'price at time of order']
+  price int [not null]
   subtotal int [not null]
-  created_at timestamp [default: `now()`]
-  
-  indexes {
-    order_id
-    product_id
-  }
+  created_at timestamp
 }
 
 Table payments {
-  id uuid [pk, default: `gen_random_uuid()`]
-  order_id varchar(50) [unique, not null, note: 'order number from orders table']
-  order_uuid uuid [not null]
+  id uuid [pk]
+  order_id varchar(50) [unique, not null]
+  order_uuid uuid [not null, ref: - orders.id]
   midtrans_transaction_id varchar(255)
   amount int [not null]
   total_amount int [not null]
-  status varchar(50) [not null, default: 'pending', note: 'pending, success, failed, cancelled, expired']
-  payment_method varchar(50) [not null, note: 'bank_transfer, gopay, credit_card, qris']
+  status varchar(50) [not null, default: 'pending']
+  payment_method varchar(50) [not null]
   payment_type varchar(50) [default: 'midtrans']
   fraud_status varchar(50)
   va_number varchar(50)
   bank_type varchar(50)
   qr_code_url text
   expiry_time timestamp
-  midtrans_response text [note: 'raw JSON response from Midtrans']
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    order_id
-    order_uuid
-    midtrans_transaction_id
-    status
-  }
+  midtrans_response text
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table reviews {
-  id uuid [pk, default: `gen_random_uuid()`]
-  product_id uuid [not null]
-  user_id uuid [not null]
-  order_id uuid [not null]
-  rating int [not null, note: '1-5 stars']
+  id uuid [pk]
+  product_id uuid [not null, ref: > products.id]
+  user_id uuid [not null, ref: > users.id]
+  order_id uuid [not null, ref: > orders.id]
+  rating int [not null]
   review_text text
-  review_images text [note: 'JSON array of image URLs']
-  created_at timestamp [default: `now()`]
-  updated_at timestamp [default: `now()`]
-  
-  indexes {
-    product_id
-    user_id
-    order_id
-    rating
-    (user_id, product_id, order_id) [unique, note: 'one review per product per order']
-  }
+  review_images text
+  created_at timestamp
+  updated_at timestamp
 }
 
-// Relationships
-Ref: categories.parent_id > categories.id 
-Ref: products.category_id > categories.id [delete: cascade]
-Ref: product_images.product_id > products.id [delete: cascade]
-Ref: carts.user_id - users.id [delete: cascade]
-Ref: cart_items.cart_id > carts.id [delete: cascade]
-Ref: cart_items.product_id > products.id [delete: cascade]
-Ref: addresses.user_id > users.id [delete: cascade]
-Ref: orders.user_id > users.id
-Ref: orders.shipping_address_id > addresses.id
-Ref: order_items.order_id > orders.id [delete: cascade]
-Ref: order_items.product_id > products.id
-Ref: payments.order_uuid > orders.id
-Ref: reviews.product_id > products.id [delete: cascade]
-Ref: reviews.user_id > users.id [delete: cascade]
-Ref: reviews.order_id > orders.id [delete: cascade]
+Ref: "sellers"."id" < "sellers"."shop_description"
