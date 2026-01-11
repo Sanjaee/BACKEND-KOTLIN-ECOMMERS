@@ -104,6 +104,30 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	util.SuccessResponse(c, http.StatusOK, "Products retrieved successfully", response)
 }
 
+// SearchProducts handles product search by keyword
+// GET /api/v1/products/search?q=keyword
+func (h *ProductHandler) SearchProducts(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	keyword := strings.TrimSpace(c.Query("q"))
+
+	if keyword == "" {
+		util.BadRequest(c, "Search keyword is required")
+		return
+	}
+
+	activeOnlyStr := c.DefaultQuery("active_only", "true")
+	activeOnly := activeOnlyStr == "true"
+
+	response, err := h.productService.SearchProducts(page, limit, keyword, activeOnly)
+	if err != nil {
+		util.ErrorResponse(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	util.SuccessResponse(c, http.StatusOK, "Products found successfully", response)
+}
+
 // UpdateProduct handles product update
 // PUT /api/v1/products/:id
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {

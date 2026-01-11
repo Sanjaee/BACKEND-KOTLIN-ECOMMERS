@@ -12,6 +12,7 @@ type ProductService interface {
 	CreateProduct(userID string, req CreateProductRequest) (*model.Product, error)
 	GetProductByID(id string) (*model.Product, error)
 	GetProducts(page, limit int, categoryID, featured, activeOnly *string) (*ProductListResponse, error)
+	SearchProducts(page, limit int, keyword string, activeOnly bool) (*ProductListResponse, error)
 	UpdateProduct(id string, req UpdateProductRequest) (*model.Product, error)
 	DeleteProduct(id string) error
 	AddProductImage(productID string, req AddProductImageRequest) (*model.ProductImage, error)
@@ -155,6 +156,36 @@ func (s *productService) GetProducts(page, limit int, categoryID, featured, acti
 	products, total, err := s.productRepo.FindAll(page, limit, categoryIDPtr, featuredPtr, activeOnlyBool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get products: %w", err)
+	}
+
+	return &ProductListResponse{
+		Products: products,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+	}, nil
+}
+
+func (s *productService) SearchProducts(page, limit int, keyword string, activeOnly bool) (*ProductListResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	if keyword == "" {
+		return &ProductListResponse{
+			Products: []model.Product{},
+			Total:    0,
+			Page:     page,
+			Limit:    limit,
+		}, nil
+	}
+
+	products, total, err := s.productRepo.Search(page, limit, keyword, activeOnly)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search products: %w", err)
 	}
 
 	return &ProductListResponse{

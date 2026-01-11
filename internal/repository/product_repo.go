@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+	"strings"
 	"yourapp/internal/model"
 
 	"gorm.io/gorm"
@@ -11,6 +13,7 @@ type ProductRepository interface {
 	FindByID(id string) (*model.Product, error)
 	FindBySKU(sku string) (*model.Product, error)
 	FindAll(page, limit int, categoryID *string, featured *bool, activeOnly bool) ([]model.Product, int64, error)
+	Search(page, limit int, keyword string, activeOnly bool) ([]model.Product, int64, error)
 	Update(product *model.Product) error
 	Delete(id string) error
 	CreateImage(image *model.ProductImage) error
@@ -76,6 +79,48 @@ func (r *productRepository) FindAll(page, limit int, categoryID *string, feature
 
 	offset := (page - 1) * limit
 	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&products).Error
+	return products, total, err
+}
+
+func (r *productRepository) Search(page, limit int, keyword string, activeOnly bool) ([]model.Product, int64, error) {
+	var products []model.Product
+	var total int64
+
+	query := r.db.Model(&model.Product{}).Preload("Category").Preload("ProductImages", func(db *gorm.DB) *gorm.DB {
+		return db.Order("sort_order ASC")
+	})
+
+	// Search in name, description, and SKU using ILIKE for case-insensitive search (PostgreSQL)
+	// ILIKE is PostgreSQL specific for case-insensitive search
+	searchPattern := "%" + keyword + "%"
+	query = query.Where(
+		"(LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?) OR LOWER(sku) LIKE LOWER(?))",
+		searchPattern, searchPattern, searchPattern,
+	)
+
+	if activeOnly {
+		query = query.Where("is_active = ?", true)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	// Order by relevance: exact match in name first, then SKU, then description
+	// Build CASE expression with keyword directly in SQL (safe as it's already validated)
+	exactKeywordLower := strings.ToLower(keyword)
+	exactKeywordPattern := "%" + exactKeywordLower + "%"
+	orderSQL := fmt.Sprintf("CASE WHEN LOWER(name) LIKE LOWER('%s') THEN 1 WHEN LOWER(sku) LIKE LOWER('%s') THEN 2 ELSE 3 END",
+		strings.ReplaceAll(exactKeywordPattern, "'", "''"),
+		strings.ReplaceAll(exactKeywordPattern, "'", "''"))
+	err := query.
+		Order(orderSQL).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&products).Error
+
 	return products, total, err
 }
 

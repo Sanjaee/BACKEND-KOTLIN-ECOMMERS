@@ -172,6 +172,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		products := api.Group("/products")
 		{
 			products.GET("", productHandler.GetProducts)
+			products.GET("/search", productHandler.SearchProducts)
 			products.GET("/:id", productHandler.GetProduct)
 
 			// Protected routes (requires auth)
