@@ -49,6 +49,8 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		&model.Product{},
 		&model.ProductImage{},
 		&model.Address{},
+		&model.Cart{},
+		&model.CartItem{},
 		&model.Order{},
 		&model.OrderItem{},
 		&model.Payment{},
@@ -62,6 +64,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	categoryRepo := repository.NewCategoryRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	addressRepo := repository.NewAddressRepository(db)
+	cartRepo := repository.NewCartRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
 	paymentRepo := repository.NewPaymentRepository(db)
 
@@ -108,6 +111,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	sellerService := service.NewSellerService(sellerRepo, userRepo)
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, categoryRepo, sellerRepo)
+	cartService := service.NewCartService(cartRepo, productRepo)
 	orderService := service.NewOrderService(orderRepo, productRepo, addressRepo)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, cfg)
 
@@ -116,6 +120,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	sellerHandler := NewSellerHandler(sellerService)
 	categoryHandler := NewCategoryHandler(categoryService)
 	productHandler := NewProductHandler(productService, cfg)
+	cartHandler := NewCartHandler(cartService)
 	orderHandler := NewOrderHandler(orderService)
 	paymentHandler := NewPaymentHandler(paymentService)
 
@@ -186,6 +191,18 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 				productsProtected.POST("/:id/images/upload", productHandler.UploadMultipleProductImages)
 				productsProtected.DELETE("/images/:imageId", productHandler.DeleteProductImage)
 			}
+		}
+
+		// Cart routes (protected)
+		carts := api.Group("/carts")
+		carts.Use(authHandler.AuthMiddleware())
+		{
+			carts.GET("", cartHandler.GetCart)
+			carts.DELETE("", cartHandler.ClearCart)
+			carts.GET("/items", cartHandler.GetCartItems)
+			carts.POST("/items", cartHandler.AddItemToCart)
+			carts.PUT("/items/:id", cartHandler.UpdateCartItem)
+			carts.DELETE("/items/:id", cartHandler.RemoveCartItem)
 		}
 
 		// Order routes (protected)

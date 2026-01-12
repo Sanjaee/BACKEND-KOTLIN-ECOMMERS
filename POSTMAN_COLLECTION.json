@@ -420,6 +420,117 @@
 			]
 		},
 		{
+			"name": "Carts",
+			"item": [
+				{
+					"name": "Get Cart",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts"]
+						},
+						"description": "Get user's cart with all cart items. Cart will be created automatically if not exists."
+					}
+				},
+				{
+					"name": "Get Cart Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts/items",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts", "items"]
+						},
+						"description": "Get all cart items for authenticated user."
+					}
+				},
+				{
+					"name": "Add Item to Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"product_id\": \"product-uuid-here\",\n  \"quantity\": 2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts/items",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts", "items"]
+						},
+						"description": "Add product to cart. If product already exists in cart, quantity will be increased."
+					}
+				},
+				{
+					"name": "Update Cart Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quantity\": 5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts/items/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts", "items", ":id"],
+							"variable": [
+								{"key": "id", "value": "cart-item-uuid-here"}
+							]
+						},
+						"description": "Update cart item quantity. Price will be updated to current product price."
+					}
+				},
+				{
+					"name": "Remove Cart Item",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts/items/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts", "items", ":id"],
+							"variable": [
+								{"key": "id", "value": "cart-item-uuid-here"}
+							]
+						},
+						"description": "Remove item from cart."
+					}
+				},
+				{
+					"name": "Clear Cart",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{"key": "Authorization", "value": "Bearer {{auth_token}}", "description": "JWT token dari login"}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/carts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "carts"]
+						},
+						"description": "Clear all items from cart."
+					}
+				}
+			]
+		},
+		{
 			"name": "Payments",
 			"item": [
 				{
