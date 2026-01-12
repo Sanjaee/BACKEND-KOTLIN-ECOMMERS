@@ -30,11 +30,11 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      # RabbitMQ
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=${RABBITMQ_USER:-yourapp}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-password123}
+      # RabbitMQ (Commented out - not needed for now)
+      # - RABBITMQ_HOST=rabbitmq
+      # - RABBITMQ_PORT=5672
+      # - RABBITMQ_USER=${RABBITMQ_USER:-yourapp}
+      # - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-password123}
       # Email
       - EMAIL_FROM=${EMAIL_FROM:-gamingafriza005@gmail.com}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
@@ -51,8 +51,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      # rabbitmq:
+      #   condition: service_healthy
     networks:
       - yourapp_network
     restart: unless-stopped
@@ -92,24 +92,24 @@ services:
       retries: 5
     command: redis-server --appendonly yes
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: yourapp_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-yourapp}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-password123}
-    ports:
-      - "5672:5672"   # AMQP port
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - yourapp_network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # rabbitmq:
+  #   image: rabbitmq:3-management-alpine
+  #   container_name: yourapp_rabbitmq
+  #   environment:
+  #     RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-yourapp}
+  #     RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-password123}
+  #   ports:
+  #     - "5672:5672"   # AMQP port
+  #     - "15672:15672" # Management UI
+  #   volumes:
+  #     - rabbitmq_data:/var/lib/rabbitmq
+  #   networks:
+  #     - yourapp_network
+  #   healthcheck:
+  #     test: ["CMD", "rabbitmq-diagnostics", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # pgweb:
   #   image: sosedoff/pgweb:latest
@@ -128,7 +128,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  rabbitmq_data:
+  # rabbitmq_data:
 
 networks:
   yourapp_network:
